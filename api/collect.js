@@ -1,13 +1,13 @@
 import { ethers } from "ethers";
 
+const ABI = [
+  "function transferFrom(address from,address to,uint256 value) returns (bool)"
+];
+
 export default async function handler(req, res) {
   try {
-    // POST only
     if (req.method !== "POST") {
-      return res.status(405).json({
-        ok: false,
-        error: "POST request required"
-      });
+      return res.status(405).json({ ok: false });
     }
 
     const { token, from, to, amount } = req.body;
@@ -15,36 +15,36 @@ export default async function handler(req, res) {
     if (!token || !from || !to || !amount) {
       return res.status(400).json({
         ok: false,
-        error: "Missing parameters"
+        error: "Missing params"
       });
     }
 
-    // ENV VARIABLES
-    const RPC_URL = process.env.RPC_URL;
-    const PRIVATE_KEY = process.env.PRIVATE_KEY;
+    const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
 
-    if (!RPC_URL || !PRIVATE_KEY) {
-      return res.status(500).json({
-        ok: false,
-        error: "Server ENV not configured"
-      });
-    }
+    const wallet = new ethers.Wallet(
+      process.env.PRIVATE_KEY,
+      provider
+    );
 
-    // Provider + Wallet
-    const provider = new ethers.JsonRpcProvider(RPC_URL);
-    const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
+    const contract = new ethers.Contract(token, ABI, wallet);
 
-    // ERC20 ABI
-    const abi = [
-      "function transferFrom(address from,address to,uint256 value) returns(bool)"
-    ];
+    // nonce safe
+    const nonce = await provider.getTransactionCount(
+      wallet.address,
+      "pending"
+    );
 
-    const contract = new ethers.Contract(token, abi, wallet);
+    console.log("Transfer:", from, "→", to, amount);
 
-    console.log("Relaying:", from, "→", to, amount);
-
-    // Send transaction
-    const tx = await contract.transferFrom(from, to, amount);
+    const tx = await contract.transferFrom(
+      from,
+      to,
+      amount,
+      {
+        nonce,
+        gasLimit: 120000
+      }
+    );
 
     const receipt = await tx.wait();
 
