@@ -1,17 +1,8 @@
 {
   "version": 2,
-  "rewrites": [
-    {
-      "source": "/",
-      "destination": "/api/index"
-    },
-    {
-      "source": "/collect",
-      "destination": "/api/collect"
-    },
-    {
-      "source": "/send",
-      "destination": "/api/send"
+  "functions": {
+    "api/*.js": {
+      "runtime": "nodejs20.x"
     }
-  ]
+  }
 }
