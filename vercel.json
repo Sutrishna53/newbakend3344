@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/collect",
+      "destination": "/api/collect"
+    },
+    {
+      "source": "/send",
+      "destination": "/api/send"
+    }
+  ]
+}
