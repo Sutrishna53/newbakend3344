@@ -1,8 +1,16 @@
 {
-  "name": "bsc-relayer",
+  "name": "collector-api",
   "version": "1.0.0",
+  "private": true,
   "type": "module",
+  "description": "BSC USDT Collector API for Vercel",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "start": "vercel dev",
+    "build": "echo Build complete"
+  },
   "dependencies": {
-    "ethers": "^6.11.1"
+    "ethers": "^6.13.0"
   }
 }
